@@ -44,7 +44,7 @@ export default function MqttCards() {
         const obj: Msg = JSON.parse(payload.toString());
         switch (topic) {
           case 'bems/bh1750':
-            setLux(fmt(obj.avg_lux));
+            setLux(fmt(obj.lux));
             setLuxTime(obj.datetime ?? '—'); // 🕒 ambil waktu
             break;
           case 'bems/guva': setUvi(fmt(obj.uvi)); break;
