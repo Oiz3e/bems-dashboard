@@ -12,12 +12,15 @@ export default function MqttCards() {
   const [status, setStatus] = useState('connecting');
 
   const [lux, setLux] = useState('—');
-  const [luxTime, setLuxTime] = useState('—'); // 🕒 waktu publish BH1750
+  const [luxTime, setLuxTime] = useState('—');
 
   const [uvi, setUvi] = useState('—');
   const [tc, setTc] = useState('—');
+
   const [dhtT, setDhtT] = useState('—');
   const [dhtH, setDhtH] = useState('—');
+  const [dhtTime, setDhtTime] = useState('—'); // 🕒 waktu publish DHT11
+
   const [temtV, setTemtV] = useState('—');
   const [gx, setGx] = useState('—');
   const [gy, setGy] = useState('—');
@@ -45,16 +48,35 @@ export default function MqttCards() {
         switch (topic) {
           case 'bems/bh1750':
             setLux(fmt(obj.lux));
-            setLuxTime(obj.datetime ?? '—'); // 🕒 ambil waktu
+            setLuxTime(obj.datetime ?? '—');
             break;
-          case 'bems/guva': setUvi(fmt(obj.uvi)); break;
-          case 'bems/max6675': setTc(obj?.error ? 'OPEN' : fmt(obj.tempC)); break;
-          case 'bems/dht11': setDhtT(fmt(obj.tempC)); setDhtH(fmt(obj.hum)); break;
-          case 'bems/temt6000': setTemtV(fmt(obj.volts)); break;
-          case 'bems/mpu6050': setGx(fmt(obj.gx)); setGy(fmt(obj.gy)); setGz(fmt(obj.gz)); break;
-          case 'bems/hall': setHall(fmt(obj.state)); break;
-          case 'bems/sound': setSound(fmt(obj.level)); break;
-          default: break;
+          case 'bems/guva':
+            setUvi(fmt(obj.uvi));
+            break;
+          case 'bems/max6675':
+            setTc(obj?.error ? 'OPEN' : fmt(obj.tempC));
+            break;
+          case 'bems/dht11':
+            setDhtT(fmt(obj.tempC));
+            setDhtH(fmt(obj.hum));
+            setDhtTime(obj.datetime ?? '—'); // 🕒 ambil waktu publish DHT11
+            break;
+          case 'bems/temt6000':
+            setTemtV(fmt(obj.volts));
+            break;
+          case 'bems/mpu6050':
+            setGx(fmt(obj.gx));
+            setGy(fmt(obj.gy));
+            setGz(fmt(obj.gz));
+            break;
+          case 'bems/hall':
+            setHall(fmt(obj.state));
+            break;
+          case 'bems/sound':
+            setSound(fmt(obj.level));
+            break;
+          default:
+            break;
         }
       } catch { /* payload bukan JSON */ }
     });
@@ -67,10 +89,10 @@ export default function MqttCards() {
       <div style={{ marginBottom: 12, fontSize: 12, opacity: 0.7 }}>Status: {status}</div>
       <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         <Card title="BH1750 (Lux)" value={lux} time={luxTime} />
+        <Card title="DHT11 Temp (°C)" value={dhtT} time={dhtTime} />
+        <Card title="DHT11 Humidity (%)" value={dhtH} time={dhtTime} />
         <Card title="GUVA (UVI)" value={uvi} />
         <Card title="MAX6675 (°C)" value={tc} />
-        <Card title="DHT11 Temp (°C)" value={dhtT} />
-        <Card title="DHT11 Humidity (%)" value={dhtH} />
         <Card title="TEMT6000 (V)" value={temtV} />
         <Card title="MPU6050 gx (°/s)" value={gx} />
         <Card title="MPU6050 gy (°/s)" value={gy} />
