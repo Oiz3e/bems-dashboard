@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Header from './components/Header';
-import HistoryChart from './components/HistoryChart';
+import HistoryChart from './components/HistoryChart'; // Pastikan ini diimport
 import AnalyticsPrediction from './components/AnalyticsPrediction';
 import Footer from './components/Footer';
 
@@ -10,13 +10,17 @@ import { useEffect, useRef, useState } from 'react';
 import mqtt from 'mqtt/dist/mqtt.min';
 import type { MqttClient } from 'mqtt';
 
-// Konfigurasi URL MQTT dari environment variable
 const URL = process.env.NEXT_PUBLIC_MQTT_WS_URL as string;
-console.log('Connecting to MQTT Broker:', URL); // Debugging koneksi MQTT
+console.log('Connecting to MQTT Broker:', URL);
 type Msg = Record<string, any>;
 
-// Dynamic import untuk MqttCards, hanya dimuat di sisi klien (SSR dinonaktifkan)
 const MqttCards = dynamic(() => import('./components/MqttCards'), { ssr: false });
+
+// Definisi interface untuk data historis
+interface SensorDataPoint {
+  time: string; // Timestamp atau label waktu
+  value: number; // Nilai sensor
+}
 
 export default function Page() {
   const clientRef = useRef<MqttClient | null>(null);
@@ -37,6 +41,35 @@ export default function Page() {
     gas: 'N/A',
     vibration: 'N/A',
   });
+
+  // --- Tambahan State untuk Data Historis ---
+  const [temperatureHistory, setTemperatureHistory] = useState<SensorDataPoint[]>([]);
+  const [humidityHistory, setHumidityHistory] = useState<SensorDataPoint[]>([]);
+  const [lightHistory, setLightHistory] = useState<SensorDataPoint[]>([]);
+  const [noiseHistory, setNoiseHistory] = useState<SensorDataPoint[]>([]);
+  const [gasHistory, setGasHistory] = useState<SensorDataPoint[]>([]);
+  const [vibrationHistory, setVibrationHistory] = useState<SensorDataPoint[]>([]);
+
+  // Fungsi helper untuk menambahkan data point dan membatasi jumlah data
+  const addDataPoint = (
+    history: SensorDataPoint[],
+    setValue: React.Dispatch<React.SetStateAction<SensorDataPoint[]>>,
+    value: number,
+    timestamp: string,
+    maxPoints: number = 20 // Batasi jumlah titik data untuk grafik realtime (misal: 20 data terakhir)
+  ) => {
+    const newPoint = { time: timestamp, value: value };
+    setValue((prevHistory) => {
+      const updatedHistory = [...prevHistory, newPoint];
+      // Jika melebihi batas, hapus data terlama
+      if (updatedHistory.length > maxPoints) {
+        return updatedHistory.slice(updatedHistory.length - maxPoints);
+      }
+      return updatedHistory;
+    });
+  };
+  // --- Akhir Tambahan State untuk Data Historis ---
+
 
   useEffect(() => {
     if (!URL) {
@@ -69,29 +102,76 @@ export default function Page() {
     client.on('message', (topic, payload) => {
       try {
         const obj: Msg = JSON.parse(payload.toString());
-        // Menggunakan datetime dari payload jika ada, jika tidak pakai waktu lokal browser
         const sensorTimestamp = obj.datetime ?? new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         switch (topic) {
           case 'bems/bh1750':
-            if (obj.lux !== undefined) setLight(obj.lux);
+            if (obj.lux !== undefined) {
+              const numericValue = parseFloat(obj.lux);
+              if (!isNaN(numericValue)) {
+                setLight(numericValue);
+                addDataPoint(lightHistory, setLightHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setLight('—');
+              }
+            }
             setLastUpdated((prev) => ({ ...prev, light: sensorTimestamp }));
             break;
           case 'bems/dht11':
-            if (obj.tempC !== undefined) setTemperature(obj.tempC);
-            if (obj.hum !== undefined) setHumidity(obj.hum);
+            if (obj.tempC !== undefined) {
+              const numericValue = parseFloat(obj.tempC);
+              if (!isNaN(numericValue)) {
+                setTemperature(numericValue);
+                addDataPoint(temperatureHistory, setTemperatureHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setTemperature('—');
+              }
+            }
+            if (obj.hum !== undefined) {
+              const numericValue = parseFloat(obj.hum);
+              if (!isNaN(numericValue)) {
+                setHumidity(numericValue);
+                addDataPoint(humidityHistory, setHumidityHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setHumidity('—');
+              }
+            }
             setLastUpdated((prev) => ({ ...prev, temperature: sensorTimestamp, humidity: sensorTimestamp }));
             break;
           case 'bems/sound':
-            if (obj.level !== undefined) setNoise(obj.level);
+            if (obj.level !== undefined) {
+              const numericValue = parseFloat(obj.level);
+              if (!isNaN(numericValue)) {
+                setNoise(numericValue);
+                addDataPoint(noiseHistory, setNoiseHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setNoise('—');
+              }
+            }
             setLastUpdated((prev) => ({ ...prev, noise: sensorTimestamp }));
             break;
           case 'bems/mq2':
-            if (obj.gas_ppm !== undefined) setGas(obj.gas_ppm);
+            if (obj.gas_ppm !== undefined) {
+              const numericValue = parseFloat(obj.gas_ppm);
+              if (!isNaN(numericValue)) {
+                setGas(numericValue);
+                addDataPoint(gasHistory, setGasHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setGas('—');
+              }
+            }
             setLastUpdated((prev) => ({ ...prev, gas: sensorTimestamp }));
             break;
           case 'bems/mpu6050_vibration':
-            if (obj.vibration_mag !== undefined) setVibration(obj.vibration_mag);
+            if (obj.vibration_mag !== undefined) {
+              const numericValue = parseFloat(obj.vibration_mag);
+              if (!isNaN(numericValue)) {
+                setVibration(numericValue);
+                addDataPoint(vibrationHistory, setVibrationHistory, numericValue, sensorTimestamp); // Tambahkan ke historis
+              } else {
+                setVibration('—');
+              }
+            }
             setLastUpdated((prev) => ({ ...prev, vibration: sensorTimestamp }));
             break;
           default:
@@ -104,6 +184,7 @@ export default function Page() {
 
     return () => client.end(true);
   }, []); // Array dependensi kosong agar useEffect hanya berjalan sekali saat komponen mount
+
 
   const fmt = (v: number | string | null | undefined): string => {
     if (v === null || v === undefined || v === '—') return '—';
@@ -150,7 +231,15 @@ export default function Page() {
         {/* Section Grafik Historis */}
         <section aria-label="Grafik Historis">
           <h2 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#cbd5e1' }}>Grafik Historis</h2>
-          <HistoryChart />
+          {/* Meneruskan data historis ke HistoryChart */}
+          <HistoryChart
+            temperatureHistory={temperatureHistory}
+            humidityHistory={humidityHistory}
+            lightHistory={lightHistory}
+            noiseHistory={noiseHistory}
+            gasHistory={gasHistory}
+            vibrationHistory={vibrationHistory}
+          />
         </section>
 
         {/* Section Analitik & Prediksi */}
