@@ -31,7 +31,8 @@ export default function Page() {
   const [light, setLight] = useState<number | string>('—');
   const [noise, setNoise] = useState<number | string>('—');
   const [gas, setGas] = useState<number | string>('—');
-  const [vibration, setVibration] = useState<number | string>('—'); // Akan diisi 0 atau 1
+  const [vibration, setVibration] = useState<number | string>('—');
+  const [uvStatus, setUvStatus] = useState<number | string>('—'); // <-- BARU: Menggantikan 'uvSensor'
 
   const [lastUpdated, setLastUpdated] = useState<Record<string, string>>({
     temperature: 'N/A',
@@ -40,6 +41,7 @@ export default function Page() {
     noise: 'N/A',
     gas: 'N/A',
     vibration: 'N/A',
+    uv_status: 'N/A', // <-- BARU: Menggantikan 'uv_sensor'
   });
 
   // --- State untuk Data Historis ---
@@ -48,9 +50,8 @@ export default function Page() {
   const [lightHistory, setLightHistory] = useState<SensorDataPoint[]>([]);
   const [noiseHistory, setNoiseHistory] = useState<SensorDataPoint[]>([]);
   const [gasHistory, setGasHistory] = useState<SensorDataPoint[]>([]);
-  
-  // State 'vibrationHistory' harus ada dan diisi
-  const [vibrationHistory, setVibrationHistory] = useState<SensorDataPoint[]>([]); 
+  const [vibrationHistory, setVibrationHistory] = useState<SensorDataPoint[]>([]);
+  const [uvStatusHistory, setUvStatusHistory] = useState<SensorDataPoint[]>([]); // <-- BARU: Menggantikan 'uvHistory'
 
   // Fungsi helper untuk menambahkan data point dan membatasi jumlah data
   const addDataPoint = (
@@ -70,7 +71,6 @@ export default function Page() {
       return updatedHistory;
     });
   };
-
 
   useEffect(() => {
     if (!URL) {
@@ -103,108 +103,148 @@ export default function Page() {
     client.on('message', (topic, payload) => {
       try {
         const obj: Msg = JSON.parse(payload.toString());
-        const sensorTimestamp = obj.datetime ?? new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const sensorTimestamp =
+          obj.datetime ??
+          new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
 
         switch (topic) {
-            
           // =======================================================
-          // 1. TOPIC: bems/environment (Gabungan Lux, Temp, Hum)
+          // 1. TOPIC: bems/environment
           // =======================================================
           case 'bems/environment':
-              
-              // Lux
-              if (obj.lux !== undefined) {
-                  const luxValue = parseFloat(obj.lux);
-                  if (!isNaN(luxValue)) {
-                      setLight(luxValue);
-                      addDataPoint(lightHistory, setLightHistory, luxValue, sensorTimestamp);
-                  } else {
-                      setLight('—');
-                  }
+            if (obj.lux !== undefined) {
+              const luxValue = parseFloat(obj.lux);
+              if (!isNaN(luxValue)) {
+                setLight(luxValue);
+                addDataPoint(
+                  lightHistory,
+                  setLightHistory,
+                  luxValue,
+                  sensorTimestamp
+                );
+              } else {
+                setLight('—');
               }
-              
-              // Temperature
-              if (obj.tempC !== undefined) {
-                  const tempValue = parseFloat(obj.tempC);
-                  if (!isNaN(tempValue)) {
-                      setTemperature(tempValue);
-                      addDataPoint(temperatureHistory, setTemperatureHistory, tempValue, sensorTimestamp);
-                  } else {
-                      setTemperature('—');
-                  }
+            }
+            if (obj.tempC !== undefined) {
+              const tempValue = parseFloat(obj.tempC);
+              if (!isNaN(tempValue)) {
+                setTemperature(tempValue);
+                addDataPoint(
+                  temperatureHistory,
+                  setTemperatureHistory,
+                  tempValue,
+                  sensorTimestamp
+                );
+              } else {
+                setTemperature('—');
               }
-              
-              // Humidity
-              if (obj.hum !== undefined) {
-                  const humValue = parseFloat(obj.hum);
-                  if (!isNaN(humValue)) {
-                      setHumidity(humValue);
-                      addDataPoint(humidityHistory, setHumidityHistory, humValue, sensorTimestamp);
-                  } else {
-                      setHumidity('—');
-                  }
+            }
+            if (obj.hum !== undefined) {
+              const humValue = parseFloat(obj.hum);
+              if (!isNaN(humValue)) {
+                setHumidity(humValue);
+                addDataPoint(
+                  humidityHistory,
+                  setHumidityHistory,
+                  humValue,
+                  sensorTimestamp
+                );
+              } else {
+                setHumidity('—');
               }
-              
-              setLastUpdated((prev) => ({ ...prev, light: sensorTimestamp, temperature: sensorTimestamp, humidity: sensorTimestamp }));
-              break;
-            
+            }
+            setLastUpdated((prev) => ({
+              ...prev,
+              light: sensorTimestamp,
+              temperature: sensorTimestamp,
+              humidity: sensorTimestamp,
+            }));
+            break;
+
           // =======================================================
-          // 2. TOPIC: bems/gas_sound (Gabungan MQ-2 ADC dan Sound dB)
+          // 2. TOPIC: bems/gas_sound
           // =======================================================
-           case 'bems/gas_sound':
-              
-              // Gas (MQ-2 ADC Value)
-              if (obj.mq2_adc !== undefined) {
-                  const gasValue = parseFloat(obj.mq2_adc);
-                  if (!isNaN(gasValue)) {
-                      setGas(gasValue);
-                      addDataPoint(gasHistory, setGasHistory, gasValue, sensorTimestamp);
-                  } else {
-                      setGas('—');
-                  }
+          case 'bems/gas_sound':
+            if (obj.mq2_adc !== undefined) {
+              const gasValue = parseFloat(obj.mq2_adc);
+              if (!isNaN(gasValue)) {
+                setGas(gasValue);
+                addDataPoint(
+                  gasHistory,
+                  setGasHistory,
+                  gasValue,
+                  sensorTimestamp
+                );
+              } else {
+                setGas('—');
               }
-              
-              // ==========================================================
-              //  PERBAIKAN DI SINI: Ubah 'sound_dB' menjadi 'sound_status_avg'
-              // ==========================================================
-              
-              // Cek key 'sound_status_avg' (dari ESP32)
-              if (obj.sound_status_avg !== undefined) { 
-                  const noiseValue = parseFloat(obj.sound_status_avg); // Akan bernilai 0.0 - 1.0
-                  if (!isNaN(noiseValue)) {
-                      setNoise(noiseValue);
-                      addDataPoint(noiseHistory, setNoiseHistory, noiseValue, sensorTimestamp);
-                  } else {
-                      setNoise('—');
-                  }
+            }
+            if (obj.sound_status_avg !== undefined) {
+              const noiseValue = parseFloat(obj.sound_status_avg);
+              if (!isNaN(noiseValue)) {
+                setNoise(noiseValue);
+                addDataPoint(
+                  noiseHistory,
+                  setNoiseHistory,
+                  noiseValue,
+                  sensorTimestamp
+                );
+              } else {
+                setNoise('—');
               }
-              // =A========================================================
-              
-              setLastUpdated((prev) => ({ ...prev, gas: sensorTimestamp, noise: sensorTimestamp }));
-              break;
-              
+            }
+            setLastUpdated((prev) => ({
+              ...prev,
+              gas: sensorTimestamp,
+              noise: sensorTimestamp,
+            }));
+            break;
+
           // =======================================================
-          // 3. TOPIC: bems/motion (MPU6050 Status 0/1)
+          // 3. TOPIC: bems/motion
           // =======================================================
           case 'bems/motion':
-            
-            // =======================================================
-            // PERBAIKAN DI SINI:
-            // 1. Key 'vibration_status' sudah benar (sesuai ESP32)
-            // 2. addDataPoint DIKEMBALIKAN
-            // =======================================================
-            if (obj.vibration_status !== undefined) { 
-                const vibrationValue = parseFloat(obj.vibration_status); // Akan bernilai 0 atau 1
-                if (!isNaN(vibrationValue)) {
-                    setVibration(vibrationValue);
-                    // BARIS INI DIPERBAIKI (DIKEMBALIKAN)
-                    addDataPoint(vibrationHistory, setVibrationHistory, vibrationValue, sensorTimestamp); 
-                } else {
-                    setVibration('—');
-                }
+            if (obj.vibration_status !== undefined) {
+              const vibrationValue = parseFloat(obj.vibration_status);
+              if (!isNaN(vibrationValue)) {
+                setVibration(vibrationValue);
+                addDataPoint(
+                  vibrationHistory,
+                  setVibrationHistory,
+                  vibrationValue,
+                  sensorTimestamp
+                );
+              } else {
+                setVibration('—');
+              }
             }
-            
             setLastUpdated((prev) => ({ ...prev, vibration: sensorTimestamp }));
+            break;
+
+          // =======================================================
+          // 4. TOPIC BARU: bems/uv_status (Menggantikan bems/uv_sensor)
+          // =======================================================
+          case 'bems/uv_status': // <-- BARU: Topik baru
+            if (obj.uv_status !== undefined) { // <-- BARU: Cek key 'uv_status'
+              const uvValue = parseFloat(obj.uv_status); // Ini akan 0.0 - 1.0
+              if (!isNaN(uvValue)) {
+                setUvStatus(uvValue); // <-- BARU
+                addDataPoint(
+                  uvStatusHistory, // <-- BARU
+                  setUvStatusHistory, // <-- BARU
+                  uvValue,
+                  sensorTimestamp
+                );
+              } else {
+                setUvStatus('—'); // <-- BARU
+              }
+            }
+            setLastUpdated((prev) => ({ ...prev, uv_status: sensorTimestamp })); // <-- BARU
             break;
 
           default:
@@ -217,19 +257,18 @@ export default function Page() {
 
     // Cleanup
     return () => {
-        if (clientRef.current) {
-            clientRef.current.end(true);
-        }
+      if (clientRef.current) {
+        clientRef.current.end(true);
+      }
     };
   }, []); // Array dependensi kosong, tidak perlu memasukkan state history
-
 
   const fmt = (v: number | string | null | undefined): string => {
     if (v === null || v === undefined || v === '—') return '—';
     if (typeof v === 'number') return Number.isFinite(v) ? v.toFixed(1) : '—';
     return String(v);
   };
-  
+
   return (
     <div
       style={{
@@ -254,39 +293,61 @@ export default function Page() {
       >
         {/* Section Realtime Monitoring */}
         <section aria-label="Realtime Monitoring">
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#cbd5e1' }}>Realtime Monitoring</h2>
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              marginBottom: '16px',
+              color: '#cbd5e1',
+            }}
+          >
+            Realtime Monitoring
+          </h2>
           <MqttCards
             temperature={fmt(temperature)}
             humidity={fmt(humidity)}
             light={fmt(light)}
             noise={fmt(noise)}
             gas={fmt(gas)}
-            vibration={fmt(vibration)} // Mengirim "0.0" atau "1.0"
+            vibration={fmt(vibration)}
+            uvStatus={fmt(uvStatus)} // <-- BARU: Menggantikan 'uvSensor'
             lastUpdated={lastUpdated}
           />
         </section>
 
         {/* Section Grafik Historis */}
         <section aria-label="Grafik Historis">
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#cbd5e1' }}>Grafik Historis</h2>
-          
-          {/* =======================================================
-          PERBAIKAN DI SINI:
-          Prop 'vibrationHistory' DIKEMBALIKAN
-          ======================================================= */}
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              marginBottom: '16px',
+              color: '#cbd5e1',
+            }}
+          >
+            Grafik Historis
+          </h2>
+
           <HistoryChart
             temperatureHistory={temperatureHistory}
             humidityHistory={humidityHistory}
             lightHistory={lightHistory}
             noiseHistory={noiseHistory}
             gasHistory={gasHistory}
-            vibrationHistory={vibrationHistory} // <--- BARIS INI DIPERBAIKI (DIKEMBALIKAN)
+            vibrationHistory={vibrationHistory}
+            uvStatusHistory={uvStatusHistory} // <-- BARU: Menggantikan 'uvHistory'
           />
         </section>
 
         {/* Section Analitik & Prediksi */}
         <section aria-label="Analitik dan Prediksi">
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#cbd5e1' }}>Analitik & Prediksi</h2>
+          <h2
+            style={{
+              fontSize: '1.5rem',
+              marginBottom: '16px',
+              color: '#cbd5e1',
+            }}
+          >
+            Analitik & Prediksi
+          </h2>
           <AnalyticsPrediction />
         </section>
       </main>

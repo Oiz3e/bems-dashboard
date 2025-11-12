@@ -23,6 +23,7 @@ interface SensorDataPoint {
   value: number;
 }
 
+// 1. TAMBAHKAN 'uvStatusHistory' DI INTERFACE INI
 interface HistoryChartProps {
   temperatureHistory: SensorDataPoint[];
   humidityHistory: SensorDataPoint[];
@@ -30,6 +31,7 @@ interface HistoryChartProps {
   noiseHistory: SensorDataPoint[];
   gasHistory: SensorDataPoint[];
   vibrationHistory: SensorDataPoint[];
+  uvStatusHistory: SensorDataPoint[]; // <-- BARU: Menggantikan 'uvHistory'
 }
 
 const HistoryChart: React.FC<HistoryChartProps> = ({
@@ -39,6 +41,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({
   noiseHistory,
   gasHistory,
   vibrationHistory,
+  uvStatusHistory, // <-- 2. TERIMA PROP BARU DI SINI
 }) => {
   const [selectedParam, setSelectedParam] = useState('Suhu (°C)');
   const [timeRange, setTimeRange] = useState('1 Hari');
@@ -67,6 +70,8 @@ const HistoryChart: React.FC<HistoryChartProps> = ({
       case 'Kebisingan (dB)': fullHistory = noiseHistory; label = 'Kebisingan'; unit = 'dB (Analog)'; break;
       case 'Gas/Asap (ppm)': fullHistory = gasHistory; label = 'Gas/Asap'; unit = 'ppm (Relatif)'; break;
       case 'Getaran (m/s²)': fullHistory = vibrationHistory; label = 'Getaran'; unit = 'm/s²'; break;
+      // 3. UBAH CASE UNTUK 'uvStatusHistory' DI SWITCH INI
+      case 'Deteksi Api/UV (Status)': fullHistory = uvStatusHistory; label = 'Deteksi Api/UV'; unit = 'Status (0/1)'; break; // <-- BARU
       default: break;
     }
 
@@ -123,6 +128,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({
     noiseHistory,
     gasHistory,
     vibrationHistory,
+    uvStatusHistory, // <-- 4. TAMBAHKAN 'uvStatusHistory' DI DEPENDENCY ARRAY INI
   ]);
 
   // Hitung min/max untuk viewport
@@ -304,6 +310,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({
                     <option>Kebisingan (dB)</option>
                     <option>Gas/Asap (ppm)</option>
                     <option>Getaran (m/s²)</option>
+                    <option>Deteksi Api/UV (Status)</option> {/* <-- 4. UBAH OPTION DI SINI */}
                 </select>
                 <span
                     style={{

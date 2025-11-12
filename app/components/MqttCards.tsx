@@ -22,7 +22,6 @@ interface SensorCardProps {
 }
 
 // Komponen SensorCard yang menampilkan data individual sensor
-// Komponen ini sekarang "bodoh" dan hanya menerima logika dari parent
 const SensorCard: React.FC<SensorCardProps> = ({
   icon,
   title,
@@ -32,8 +31,9 @@ const SensorCard: React.FC<SensorCardProps> = ({
   getStatus,
   displayType = 'value', // Default-nya menampilkan angka
 }) => {
-  const numericValue = typeof value === 'string' && value !== '—' ? parseFloat(value) : NaN;
-  
+  const numericValue =
+    typeof value === 'string' && value !== '—' ? parseFloat(value) : NaN;
+
   // 1. Dapatkan status (teks dan warna) dari fungsi prop 'getStatus'
   const { text: statusText, color: statusColor } = isNaN(numericValue)
     ? { text: 'N/A', color: '#cbd5e1' } // Status default jika data tidak valid
@@ -89,11 +89,22 @@ const SensorCard: React.FC<SensorCardProps> = ({
         }}
       ></div>
 
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}
+      >
         <span style={{ fontSize: '2rem', marginRight: '10px' }}>{icon}</span>
-        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#cbd5e1', fontWeight: 500 }}>{title}</h3>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '1.2rem',
+            color: '#cbd5e1',
+            fontWeight: 500,
+          }}
+        >
+          {title}
+        </h3>
       </div>
-      
+
       <div
         style={{
           fontSize: '2.5rem',
@@ -101,14 +112,33 @@ const SensorCard: React.FC<SensorCardProps> = ({
           color: displayType === 'status' ? statusColor : '#e2e8f0',
           opacity: fade ? 0.7 : 1,
           transition: 'opacity 0.3s ease-in-out',
-          minHeight: '48px', 
+          minHeight: '48px',
         }}
       >
         {displayValue}{' '}
-        {displayUnit && <span style={{ fontSize: '1.2rem', fontWeight: 400, color: '#94a3b8' }}>{displayUnit}</span>}
+        {displayUnit && (
+          <span
+            style={{
+              fontSize: '1.2rem',
+              fontWeight: 400,
+              color: '#94a3b8',
+            }}
+          >
+            {displayUnit}
+          </span>
+        )}
       </div>
 
-      <div style={{ marginTop: '15px', fontSize: '0.9rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginTop: '15px',
+          fontSize: '0.9rem',
+          color: '#94a3b8',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <span style={{ color: statusColor, fontWeight: 600 }}>{statusText}</span>
         {updated && <span>Updated: {updated}</span>}
       </div>
@@ -116,50 +146,52 @@ const SensorCard: React.FC<SensorCardProps> = ({
   );
 };
 
-
 // ==========================================================
 // LOGIKA SENSOR "SATU SATU"
-// Didefinisikan di sini, di komponen parent
 // ==========================================================
 
 const getTempStatus = (v: number): CardStatus => {
   if (v > 30 || v < 18) return { text: 'Bahaya', color: '#ef4444' };
-  if (v > 28 || v < 20) return { text: 'Waspada', color: '#eab308' }; // Rentang normal 20-28°C
+  if (v > 28 || v < 20) return { text: 'Waspada', color: '#eab308' };
   return { text: 'Normal', color: '#22c55e' };
 };
 
 const getHumidityStatus = (v: number): CardStatus => {
   if (v > 70 || v < 40) return { text: 'Bahaya', color: '#ef4444' };
-  if (v > 60 || v < 45) return { text: 'Waspada', color: '#eab308' }; // Rentang normal 45-60%
+  if (v > 60 || v < 45) return { text: 'Waspada', color: '#eab308' };
   return { text: 'Normal', color: '#22c55e' };
 };
 
 const getLightStatus = (v: number): CardStatus => {
-  if (v < 20) return { text: 'Bahaya', color: '#ef4444' }; // Terlalu gelap
-  if (v < 50 || v > 1000) return { text: 'Waspada', color: '#eab308' }; // Agak gelap / terlalu silau
-  return { text: 'Normal', color: '#22c55e' }; // Rentang normal 50-1000 lux
+  if (v < 20) return { text: 'Bahaya', color: '#ef4444' };
+  if (v < 50 || v > 1000) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
 };
 
 const getNoiseStatus = (v: number): CardStatus => {
-  // Menerima nilai 0.0 - 1.0 (rata-rata status)
-  if (v > 0.5) return { text: 'Bahaya', color: '#ef4444' }; // Sering berisik
-  if (v > 0.1) return { text: 'Waspada', color: '#eab308' }; // Kadang berisik
+  if (v > 0.5) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 0.1) return { text: 'Waspada', color: '#eab308' };
   return { text: 'Normal', color: '#22c55e' };
 };
 
 const getGasStatus = (v: number): CardStatus => {
-  // Menerima nilai ADC MQ-2
-  if (v > 350) return { text: 'Bahaya', color: '#ef4444' }; // Asap tebal
-  if (v > 200) return { text: 'Waspada', color: '#eab308' }; // Kualitas udara buruk
-  return { text: 'Normal', color: '#22c55e' }; // Udara bersih (< 200)
-};
-
-const getVibrationStatus = (v: number): CardStatus => {
-  // Menerima nilai 0 (Normal) atau 1 (Moving)
-  if (v >= 1) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 350) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 200) return { text: 'Waspada', color: '#eab308' };
   return { text: 'Normal', color: '#22c55e' };
 };
 
+const getVibrationStatus = (v: number): CardStatus => {
+  if (v >= 1) return { text: 'Bahaya', color: '#ef4444' }; // Nilai 1
+  return { text: 'Normal', color: '#22c55e' }; // Nilai 0
+};
+
+// <-- LOGIKA BARU UNTUK STATUS UV (0.0 - 1.0) -->
+const getUvStatus = (v: number): CardStatus => {
+  // Menerima nilai rata-rata 0.0 (Aman) s/d 1.0 (Api)
+  // Jika rata-rata > 0.5, berarti lebih sering mendeteksi api
+  if (v > 0.5) return { text: 'BAHAYA API/UV', color: '#dc2626' }; // Merah menyala
+  return { text: 'Aman', color: '#22c55e' };
+};
 
 // ==========================================================
 // KOMPONEN UTAMA
@@ -173,6 +205,7 @@ interface MqttCardsProps {
   noise: string;
   gas: string;
   vibration: string;
+  uvStatus: string; // <-- BARU: Menggantikan 'uvSensor'
   lastUpdated: Record<string, string>;
 }
 
@@ -183,9 +216,9 @@ export default function MqttCards({
   noise,
   gas,
   vibration,
+  uvStatus, // <-- BARU: Menggantikan 'uvSensor'
   lastUpdated,
 }: MqttCardsProps) {
-  
   return (
     <div
       style={{
@@ -202,7 +235,7 @@ export default function MqttCards({
         value={temperature}
         unit="°C"
         updated={lastUpdated.temperature}
-        getStatus={getTempStatus} // <-- Melempar logika
+        getStatus={getTempStatus}
         displayType="value"
       />
       <SensorCard
@@ -211,7 +244,7 @@ export default function MqttCards({
         value={humidity}
         unit="%RH"
         updated={lastUpdated.humidity}
-        getStatus={getHumidityStatus} // <-- Melempar logika
+        getStatus={getHumidityStatus}
         displayType="value"
       />
       <SensorCard
@@ -220,7 +253,7 @@ export default function MqttCards({
         value={light}
         unit="lux"
         updated={lastUpdated.light}
-        getStatus={getLightStatus} // <-- Melempar logika
+        getStatus={getLightStatus}
         displayType="value"
       />
       <SensorCard
@@ -229,8 +262,8 @@ export default function MqttCards({
         value={noise}
         unit="Status"
         updated={lastUpdated.noise}
-        getStatus={getNoiseStatus} // <-- Melempar logika
-        displayType="status" // <-- Menampilkan teks (Normal/Bahaya)
+        getStatus={getNoiseStatus}
+        displayType="status"
       />
       <SensorCard
         icon="💨"
@@ -238,7 +271,7 @@ export default function MqttCards({
         value={gas}
         unit="ppm (Relatif)"
         updated={lastUpdated.gas}
-        getStatus={getGasStatus} // <-- Melempar logika
+        getStatus={getGasStatus}
         displayType="value"
       />
       <SensorCard
@@ -247,8 +280,19 @@ export default function MqttCards({
         value={vibration}
         unit="Status"
         updated={lastUpdated.vibration}
-        getStatus={getVibrationStatus} // <-- Melempar logika
-        displayType="status" // <-- Menampilkan teks (Normal/Bahaya)
+        getStatus={getVibrationStatus}
+        displayType="status"
+      />
+
+      {/* <-- KARTU BARU UNTUK STATUS UV/API --> */}
+      <SensorCard
+        icon="🔥" // Ikon api
+        title="Deteksi Api/UV" // Judul baru
+        value={uvStatus} // Prop baru
+        unit="Status" // Unit baru
+        updated={lastUpdated.uv_status} // lastUpdated baru
+        getStatus={getUvStatus} // Logika status baru
+        displayType="status" // Tampilkan "Aman" atau "Bahaya"
       />
     </div>
   );
