@@ -1,121 +1,299 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import mqtt from 'mqtt/dist/mqtt.min';
-import type { MqttClient } from 'mqtt';
 
-const URL = process.env.NEXT_PUBLIC_MQTT_WS_URL as string;
-type Msg = Record<string, any>;
+// Interface untuk status yang akan dikembalikan
+interface CardStatus {
+  text: string;
+  color: string;
+}
 
-export default function MqttCards() {
-  const clientRef = useRef<MqttClient | null>(null);
-  const [status, setStatus] = useState('connecting');
+// Interface untuk props yang diterima oleh komponen SensorCard
+interface SensorCardProps {
+  icon: string;
+  title: string;
+  value: string; // Nilai mentah (string) dari MQTT, misal "26.2" atau "—"
+  unit: string;
+  updated?: string;
+  // Prop baru: fungsi untuk menentukan status berdasarkan nilai
+  getStatus: (value: number) => CardStatus;
+  // Prop baru: untuk membedakan kartu status (teks) vs kartu nilai (angka)
+  displayType?: 'value' | 'status';
+}
 
-  const [lux, setLux] = useState('—');
-  const [luxTime, setLuxTime] = useState('—');
+// Komponen SensorCard yang menampilkan data individual sensor
+const SensorCard: React.FC<SensorCardProps> = ({
+  icon,
+  title,
+  value,
+  unit,
+  updated,
+  getStatus,
+  displayType = 'value', // Default-nya menampilkan angka
+}) => {
+  const numericValue =
+    typeof value === 'string' && value !== '—' ? parseFloat(value) : NaN;
 
-  const [uvi, setUvi] = useState('—');
-  const [tc, setTc] = useState('—');
+  // 1. Dapatkan status (teks dan warna) dari fungsi prop 'getStatus'
+  const { text: statusText, color: statusColor } = isNaN(numericValue)
+    ? { text: 'N/A', color: '#cbd5e1' } // Status default jika data tidak valid
+    : getStatus(numericValue); // Menjalankan logika yang dilempar dari parent
 
-  const [dhtT, setDhtT] = useState('—');
-  const [dhtH, setDhtH] = useState('—');
-  const [dhtTime, setDhtTime] = useState('—'); // 🕒 waktu publish DHT11
-
-  const [temtV, setTemtV] = useState('—');
-  const [gx, setGx] = useState('—');
-  const [gy, setGy] = useState('—');
-  const [gz, setGz] = useState('—');
-  const [hall, setHall] = useState('—');
-  const [sound, setSound] = useState('—');
+  const [fade, setFade] = useState(false);
+  const prevValueRef = useRef(value);
 
   useEffect(() => {
-    if (!URL) { setStatus('missing NEXT_PUBLIC_MQTT_WS_URL env'); return; }
+    const previousValue = prevValueRef.current;
+    let timer: NodeJS.Timeout | undefined;
+    if (value !== '—' && value !== previousValue) {
+      setFade(true);
+      timer = setTimeout(() => setFade(false), 500);
+    }
+    prevValueRef.current = value;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [value]);
 
-    const client = mqtt.connect(URL, { protocolVersion: 4 });
-    clientRef.current = client;
-
-    client.on('connect', () => {
-      setStatus('connected');
-      client.subscribe('bems/#');
-    });
-    client.on('reconnect', () => setStatus('reconnecting'));
-    client.on('close', () => setStatus('closed'));
-    client.on('error', (err) => setStatus('error: ' + (err?.message ?? 'unknown')));
-
-    client.on('message', (topic, payload) => {
-      try {
-        const obj: Msg = JSON.parse(payload.toString());
-        switch (topic) {
-          case 'bems/bh1750':
-            setLux(fmt(obj.lux));
-            setLuxTime(obj.datetime ?? '—');
-            break;
-          case 'bems/guva':
-            setUvi(fmt(obj.uvi));
-            break;
-          case 'bems/max6675':
-            setTc(obj?.error ? 'OPEN' : fmt(obj.tempC));
-            break;
-          case 'bems/dht11':
-            setDhtT(fmt(obj.tempC));
-            setDhtH(fmt(obj.hum));
-            setDhtTime(obj.datetime ?? '—'); // 🕒 ambil waktu publish DHT11
-            break;
-          case 'bems/temt6000':
-            setTemtV(fmt(obj.volts));
-            break;
-          case 'bems/mpu6050':
-            setGx(fmt(obj.gx));
-            setGy(fmt(obj.gy));
-            setGz(fmt(obj.gz));
-            break;
-          case 'bems/hall':
-            setHall(fmt(obj.state));
-            break;
-          case 'bems/sound':
-            setSound(fmt(obj.level));
-            break;
-          default:
-            break;
-        }
-      } catch { /* payload bukan JSON */ }
-    });
-
-    return () => client.end(true);
-  }, []);
+  // 2. Tentukan apa yang akan ditampilkan sebagai nilai utama
+  const displayValue = displayType === 'status' ? statusText : value;
+  const displayUnit = displayType === 'status' ? '' : unit;
 
   return (
-    <div>
-      <div style={{ marginBottom: 12, fontSize: 12, opacity: 0.7 }}>Status: {status}</div>
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        <Card title="BH1750 (Lux)" value={lux} time={luxTime} />
-        <Card title="DHT11 Temp (°C)" value={dhtT} time={dhtTime} />
-        <Card title="DHT11 Humidity (%)" value={dhtH} time={dhtTime} />
-        <Card title="GUVA (UVI)" value={uvi} />
-        <Card title="MAX6675 (°C)" value={tc} />
-        <Card title="TEMT6000 (V)" value={temtV} />
-        <Card title="MPU6050 gx (°/s)" value={gx} />
-        <Card title="MPU6050 gy (°/s)" value={gy} />
-        <Card title="MPU6050 gz (°/s)" value={gz} />
-        <Card title="Hall (state)" value={hall} />
-        <Card title="Sound (level)" value={sound} />
+    <div
+      style={{
+        backgroundColor: '#1e293b',
+        borderRadius: '16px',
+        padding: '20px',
+        boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        position: 'relative',
+        overflow: 'hidden',
+        borderBottom: `4px solid ${statusColor}`,
+        transition: 'transform 0.2s ease-in-out',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-5px)')}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          width: '10px',
+          height: '10px',
+          borderRadius: '50%',
+          backgroundColor: statusColor,
+        }}
+      ></div>
+
+      <div
+        style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}
+      >
+        <span style={{ fontSize: '2rem', marginRight: '10px' }}>{icon}</span>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '1.2rem',
+            color: '#cbd5e1',
+            fontWeight: 500,
+          }}
+        >
+          {title}
+        </h3>
+      </div>
+
+      <div
+        style={{
+          fontSize: '2.5rem',
+          fontWeight: 700,
+          color: displayType === 'status' ? statusColor : '#e2e8f0',
+          opacity: fade ? 0.7 : 1,
+          transition: 'opacity 0.3s ease-in-out',
+          minHeight: '48px',
+        }}
+      >
+        {displayValue}{' '}
+        {displayUnit && (
+          <span
+            style={{
+              fontSize: '1.2rem',
+              fontWeight: 400,
+              color: '#94a3b8',
+            }}
+          >
+            {displayUnit}
+          </span>
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: '15px',
+          fontSize: '0.9rem',
+          color: '#94a3b8',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ color: statusColor, fontWeight: 600 }}>{statusText}</span>
+        {updated && <span>Updated: {updated}</span>}
       </div>
     </div>
   );
+};
+
+// ==========================================================
+// LOGIKA SENSOR "SATU SATU"
+// ==========================================================
+
+const getTempStatus = (v: number): CardStatus => {
+  if (v > 30 || v < 18) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 28 || v < 20) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
+};
+
+const getHumidityStatus = (v: number): CardStatus => {
+  if (v > 70 || v < 40) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 60 || v < 45) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
+};
+
+const getLightStatus = (v: number): CardStatus => {
+  if (v < 20) return { text: 'Bahaya', color: '#ef4444' };
+  if (v < 50 || v > 1000) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
+};
+
+const getNoiseStatus = (v: number): CardStatus => {
+  if (v > 0.5) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 0.1) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
+};
+
+const getGasStatus = (v: number): CardStatus => {
+  if (v > 350) return { text: 'Bahaya', color: '#ef4444' };
+  if (v > 200) return { text: 'Waspada', color: '#eab308' };
+  return { text: 'Normal', color: '#22c55e' };
+};
+
+const getVibrationStatus = (v: number): CardStatus => {
+  if (v >= 1) return { text: 'Bahaya', color: '#ef4444' }; // Nilai 1
+  return { text: 'Normal', color: '#22c55e' }; // Nilai 0
+};
+
+// <-- LOGIKA BARU UNTUK STATUS UV (0.0 - 1.0) -->
+const getUvStatus = (v: number): CardStatus => {
+  // Menerima nilai rata-rata 0.0 (Aman) s/d 1.0 (Api)
+  // Jika rata-rata > 0.5, berarti lebih sering mendeteksi api
+  if (v > 0.5) return { text: 'BAHAYA API/UV', color: '#dc2626' }; // Merah menyala
+  return { text: 'Aman', color: '#22c55e' };
+};
+
+// ==========================================================
+// KOMPONEN UTAMA
+// ==========================================================
+
+// Interface untuk props yang diterima oleh komponen MqttCards
+interface MqttCardsProps {
+  temperature: string;
+  humidity: string;
+  light: string;
+  noise: string;
+  gas: string;
+  vibration: string;
+  uvStatus: string; // <-- BARU: Menggantikan 'uvSensor'
+  lastUpdated: Record<string, string>;
 }
 
-function Card({ title, value, time }: { title: string; value: string; time?: string }) {
+export default function MqttCards({
+  temperature,
+  humidity,
+  light,
+  noise,
+  gas,
+  vibration,
+  uvStatus, // <-- BARU: Menggantikan 'uvSensor'
+  lastUpdated,
+}: MqttCardsProps) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontWeight: 700 }}>{title}</div>
-      <div style={{ fontSize: 28 }}>{value}</div>
-      {time && <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>🕒 {time}</div>}
+    <div
+      style={{
+        display: 'grid',
+        gap: '20px',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        justifyContent: 'center',
+        transition: 'all 0.3s ease-in-out',
+      }}
+    >
+      <SensorCard
+        icon="🌡️"
+        title="Suhu"
+        value={temperature}
+        unit="°C"
+        updated={lastUpdated.temperature}
+        getStatus={getTempStatus}
+        displayType="value"
+      />
+      <SensorCard
+        icon="💧"
+        title="Kelembapan"
+        value={humidity}
+        unit="%RH"
+        updated={lastUpdated.humidity}
+        getStatus={getHumidityStatus}
+        displayType="value"
+      />
+      <SensorCard
+        icon="💡"
+        title="Cahaya"
+        value={light}
+        unit="lux"
+        updated={lastUpdated.light}
+        getStatus={getLightStatus}
+        displayType="value"
+      />
+      <SensorCard
+        icon="🔊"
+        title="Kebisingan"
+        value={noise}
+        unit="Status"
+        updated={lastUpdated.noise}
+        getStatus={getNoiseStatus}
+        displayType="status"
+      />
+      <SensorCard
+        icon="💨"
+        title="Gas/Asap"
+        value={gas}
+        unit="ppm (Relatif)"
+        updated={lastUpdated.gas}
+        getStatus={getGasStatus}
+        displayType="value"
+      />
+      <SensorCard
+        icon="⚡"
+        title="Getaran"
+        value={vibration}
+        unit="Status"
+        updated={lastUpdated.vibration}
+        getStatus={getVibrationStatus}
+        displayType="status"
+      />
+
+      {/* <-- KARTU BARU UNTUK STATUS UV/API --> */}
+      <SensorCard
+        icon="🔥" // Ikon api
+        title="Deteksi Api/UV" // Judul baru
+        value={uvStatus} // Prop baru
+        unit="Status" // Unit baru
+        updated={lastUpdated.uv_status} // lastUpdated baru
+        getStatus={getUvStatus} // Logika status baru
+        displayType="status" // Tampilkan "Aman" atau "Bahaya"
+      />
     </div>
   );
-}
-
-function fmt(v: any) {
-  if (v === null || v === undefined) return '—';
-  if (typeof v === 'number') return Number.isFinite(v) ? v.toFixed(2) : '—';
-  return String(v);
 }
