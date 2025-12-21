@@ -12,3 +12,5 @@ yarn-error.log*
 .env.local
 .env.*
 !.env.example
+/app/generated/prisma
+.env
