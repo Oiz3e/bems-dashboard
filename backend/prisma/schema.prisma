@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,13 +9,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Contoh Model buat EMS Dashboard lu (sesuaiin sama data MQTT lu)
-model EnergyLog {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  topic     String   // Misalnya: "sensor/voltage"
-  value     Float    // Nilai sensor
-  deviceId  String?  // ID ESP32/Arduino
-  createdAt DateTime @default(now())
+// === MODEL BARU: SATU DOKUMEN BERISI SEMUA DATA ===
+model SensorLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceId    String   // Contoh: "esp32_01"
+  
+  // Data Lingkungan
+  lux         Float
+  temperature Float
+  humidity    Float
+  
+  // Data Gas & Suara
+  mq2_adc     Float    // Nilai ADC Gas
+  noise       Float    // Dari 'sound' (0/1 atau rata-rata)
+  
+  // Data Gerak & Api
+  vibration   Float    // Status getaran
+  uv_status   Float    // Dari 'uv' status
+  
+  // Waktu
+  createdAt   DateTime @default(now())
 
-  @@map("DataSensor")
+  @@map("sensorLog") // Nama collection di MongoDB nanti
 }
