@@ -1,3 +1,11 @@
+dhawy:
 mosquitto -v -c "D:\mqtt-next-starter\mosquitto.conf"
 
-npx tsx mqtt-worker.ts
+pinceng:
+mosquitto -v -c "C:\Users\Vincent\Downloads\Sites\bems-dashboard\mosquitto.conf"
+
+be:
+nodemon mqtt-worker.ts
+
+fe:
+npm run dev

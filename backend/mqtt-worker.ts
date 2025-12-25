@@ -9,7 +9,7 @@ import mqtt from 'mqtt';
 // ==========================================
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors()); // Supaya Frontend (Port 3000) bisa akses Backend (Port 3001)
@@ -26,11 +26,12 @@ if (!MQTT_HOST || !MQTT_PORT) {
   process.exit(1);
 }
 
+// Koneksi ke Broker
 const mqttClient = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`);
 
 mqttClient.on('connect', () => {
   console.log('MQTT: Terhubung ke Broker!');
-  // Subscribe ke topik data V6
+  // Subscribe ke topik data
   mqttClient.subscribe('bems/raw/sensor');
 });
 
@@ -39,7 +40,7 @@ mqttClient.on('message', async (topic, message) => {
     try {
       const data = JSON.parse(message.toString());
       
-      // Simpan ke MongoDB (Single Document / Satu Paket)
+      // Simpan ke MongoDB (Mapping JSON ESP32 -> Prisma Schema)
       await prisma.sensorLog.create({
         data: {
           deviceId:    data.device_id || "unknown",
@@ -48,24 +49,77 @@ mqttClient.on('message', async (topic, message) => {
           humidity:    parseFloat(data.humidity || 0),
           mq2_adc:     parseFloat(data.mq2_adc || 0),
           noise:       parseFloat(data.sound || 0),      // JSON: sound -> DB: noise
-          vibration:   parseFloat(data.vibration || 0),  // JSON: vibration -> DB: vibration
+          vibration:   parseFloat(data.vibration || 0),
           uv_status:   parseFloat(data.uv || 0)          // JSON: uv -> DB: uv_status
         }
       });
 
-      console.log(`[SAVED] Data dari ${data.device_id} berhasil disimpan.`);
+      // Uncomment baris di bawah jika ingin lihat log setiap data masuk
+      // console.log(`💾 [SAVED] Data dari ${data.device_id} disimpan.`);
 
     } catch (err) {
-      console.error('MQTT Error:', err);
+      console.error('❌ MQTT Error:', err);
     }
   }
 });
 
 // ==========================================
-// 3. API ENDPOINTS (UNTUK FRONTEND)
+// 3. API ENDPOINTS
 // ==========================================
 
-// Endpoint 1: Ambil data realtime terakhir (Opsional, buat cek status)
+// Endpoint 1: Ambil data history (Support Limit, Range, & Custom Date)
+app.get('/api/history', async (req: Request, res: Response) => {
+  try {
+    const { range, start, end } = req.query; // start & end format ISO string
+    
+    // A. JIKA TIDAK ADA FILTER SAMA SEKALI (Load Awal)
+    if (!range && !start && !end) {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const history = await prisma.sensorLog.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      });
+      return res.json(history.reverse());
+    }
+
+    let startDate = new Date();
+    let endDate = new Date(); // Default sekarang
+
+    // B. LOGIC CUSTOM DATE (Jika user input tanggal manual)
+    if (start && end) {
+      startDate = new Date(start as string);
+      endDate = new Date(end as string);
+    } 
+    // C. LOGIC PRESET RANGE (1d, 1w, etc)
+    else if (range) {
+      switch (range) {
+        case '1d': startDate.setHours(startDate.getHours() - 24); break;
+        case '1w': startDate.setDate(startDate.getDate() - 7); break;
+        case '1m': startDate.setMonth(startDate.getMonth() - 1); break;
+        case '1y': startDate.setFullYear(startDate.getFullYear() - 1); break;
+      }
+    }
+
+    // Query Database dengan rentang waktu spesifik
+    const history = await prisma.sensorLog.findMany({
+      where: {
+        createdAt: {
+          gte: startDate, // Lebih besar atau sama dengan Start
+          lte: endDate,   // Lebih kecil atau sama dengan End
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(history);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Gagal mengambil history' });
+  }
+});
+
+// Endpoint 2: Ambil 1 data terbaru (Untuk debugging / cek status aktif)
 app.get('/api/latest', async (req: Request, res: Response) => {
   try {
     const latest = await prisma.sensorLog.findFirst({
@@ -74,25 +128,6 @@ app.get('/api/latest', async (req: Request, res: Response) => {
     res.json(latest);
   } catch (error) {
     res.status(500).json({ error: 'Gagal mengambil data terbaru' });
-  }
-});
-
-// Endpoint 2: Ambil data history (Untuk Grafik)
-// Contoh URL: http://localhost:3001/api/history?limit=50
-app.get('/api/history', async (req: Request, res: Response) => {
-  try {
-    // Ambil parameter limit dari URL (default 100 data terakhir)
-    const limit = parseInt(req.query.limit as string) || 100;
-
-    const history = await prisma.sensorLog.findMany({
-      take: limit,
-      orderBy: { createdAt: 'desc' }, // Urutkan dari yang terbaru
-    });
-
-    // Kita balik urutannya (asc) supaya grafik mulainya dari kiri ke kanan
-    res.json(history.reverse());
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal mengambil history' });
   }
 });
 
