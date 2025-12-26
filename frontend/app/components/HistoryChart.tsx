@@ -154,14 +154,29 @@ const HistoryChart = () => {
 
   useEffect(() => { fetchAndProcessData(); }, [timeRange, selectedParam]); 
 
+  // === UPDATE 1: Logic Mapping Label & Unit (Unit kosong untuk status) ===
   useEffect(() => {
-    if (selectedParam.includes('Suhu')) { setCurrentLabel('Suhu'); setCurrentUnit('°C'); }
-    else if (selectedParam.includes('Kelembapan')) { setCurrentLabel('Kelembapan'); setCurrentUnit('%RH'); }
-    else if (selectedParam.includes('Cahaya')) { setCurrentLabel('Cahaya'); setCurrentUnit('lux'); }
-    else if (selectedParam.includes('Kebisingan')) { setCurrentLabel('Kebisingan'); setCurrentUnit('dB'); }
-    else if (selectedParam.includes('Gas')) { setCurrentLabel('Gas'); setCurrentUnit('ppm'); }
-    else if (selectedParam.includes('Getaran')) { setCurrentLabel('Getaran'); setCurrentUnit('m/s²'); }
-    else if (selectedParam.includes('UV')) { setCurrentLabel('Api/UV'); setCurrentUnit('Sts'); }
+    if (selectedParam.includes('Suhu')) { 
+        setCurrentLabel('Suhu'); setCurrentUnit('°C'); 
+    }
+    else if (selectedParam.includes('Kelembapan')) { 
+        setCurrentLabel('Kelembapan'); setCurrentUnit('%RH'); 
+    }
+    else if (selectedParam.includes('Cahaya')) { 
+        setCurrentLabel('Cahaya'); setCurrentUnit('lux'); 
+    }
+    else if (selectedParam.includes('Gas')) { 
+        setCurrentLabel('Gas'); setCurrentUnit('ppm'); 
+    }
+    else if (selectedParam.includes('Kebisingan')) { 
+        setCurrentLabel('Kebisingan'); setCurrentUnit(''); // Unit kosong
+    }
+    else if (selectedParam.includes('Getaran')) { 
+        setCurrentLabel('Getaran'); setCurrentUnit(''); // Unit kosong
+    }
+    else if (selectedParam.includes('UV')) { 
+        setCurrentLabel('Api/UV'); setCurrentUnit(''); // Unit kosong
+    }
   }, [selectedParam]);
 
   // === 2. HELPER UNIT SUMBU X (BIAR RAPI) ===
@@ -187,7 +202,7 @@ const HistoryChart = () => {
   const chartData = {
     labels: activeData.map(d => d.time),
     datasets: [{
-      label: `${currentLabel} (${currentUnit})`,
+      label: `${currentLabel} ${currentUnit}`, // Unit akan kosong kalau status
       data: activeData.map(d => ({ x: d.time, y: d.value })),
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.2)',
@@ -225,11 +240,30 @@ const HistoryChart = () => {
              if (getChartUnit() === 'day') return format(d, 'dd MMMM yyyy', { locale: id });
              return format(d, 'dd MMM yyyy, HH:mm', { locale: id });
            },
+           // === UPDATE 2: Custom Tooltip Label (Teks Status) ===
            label: (context: any) => {
              let label = '';
-             if (context.parsed.y !== null) {
-                const val = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(context.parsed.y);
-                label = `${currentLabel}: ${val} ${currentUnit}`;
+             const val = context.parsed.y;
+             
+             if (val !== null) {
+                // LOGIKA KHUSUS SENSOR STATUS
+                if (currentLabel === 'Api/UV') {
+                    const status = val > 0.1 ? 'TERDETEKSI BAHAYA' : 'Aman';
+                    label = `Status: ${status}`;
+                } 
+                else if (currentLabel === 'Kebisingan') {
+                    const status = val > 0.1 ? 'Bising' : 'Senyap/Normal';
+                    label = `Status: ${status}`;
+                } 
+                else if (currentLabel === 'Getaran') {
+                    const status = val > 0.1 ? 'Ada Getaran' : 'Stabil';
+                    label = `Status: ${status}`;
+                } 
+                // LOGIKA SENSOR BIASA
+                else {
+                    const fmtVal = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(val);
+                    label = `${currentLabel}: ${fmtVal} ${currentUnit}`;
+                }
              }
              return label;
            }
