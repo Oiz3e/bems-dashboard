@@ -141,10 +141,10 @@ const HistoryChart = () => {
                 case 'Suhu (°C)': return item.temperature;
                 case 'Kelembapan (%RH)': return item.humidity;
                 case 'Cahaya (lux)': return item.lux;
-                case 'Kebisingan (dB)': return item.noise; 
+                case 'Kebisingan (dB)': return item.sound; 
                 case 'Gas/Asap (ppm)': return item.mq2_adc;
                 case 'Getaran (m/s²)': return item.vibration;
-                case 'Deteksi Api/UV (Status)': return item.uv_status;
+                case 'Deteksi Api/UV (Status)': return item.uv;
                 default: return 0;
             }
         };

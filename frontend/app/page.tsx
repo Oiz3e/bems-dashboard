@@ -4,7 +4,6 @@ import DashboardClient, { SensorDataPoint } from './components/DashboardClient';
 // Fungsi Fetch Data dari Backend Express
 async function getInitialHistory() {
   try {
-    // cache: 'no-store' agar data selalu fresh tiap kali refresh halaman
     const res = await fetch('http://localhost:3001/api/history?limit=20', {
       cache: 'no-store',
     });
@@ -16,25 +15,28 @@ async function getInitialHistory() {
     return await res.json();
   } catch (error) {
     console.error('Error fetching history:', error);
-    return []; // Return array kosong jika backend mati, biar gak crash
+    return []; 
   }
 }
 
 export default async function Page() {
-  // 1. Ambil data mentah dari Backend
   const rawData = await getInitialHistory();
 
-  // 2. Mapping data Backend (Snake_case/CamelCase) ke format Chart (SensorDataPoint)
+  // MAPPING: DB (sound/uv) -> Frontend (noise/uv_status)
   const initialHistory = {
     temp: rawData.map((d: any) => ({ time: d.createdAt, value: d.temperature })) as SensorDataPoint[],
     hum: rawData.map((d: any) => ({ time: d.createdAt, value: d.humidity })) as SensorDataPoint[],
     light: rawData.map((d: any) => ({ time: d.createdAt, value: d.lux })) as SensorDataPoint[],
-    noise: rawData.map((d: any) => ({ time: d.createdAt, value: d.noise })) as SensorDataPoint[], // DB: noise
+    
+    // Tetap simpan di key 'noise', ambil dari d.sound
+    noise: rawData.map((d: any) => ({ time: d.createdAt, value: d.sound ?? d.noise ?? 0 })) as SensorDataPoint[], 
+    
     gas: rawData.map((d: any) => ({ time: d.createdAt, value: d.mq2_adc })) as SensorDataPoint[],
     vib: rawData.map((d: any) => ({ time: d.createdAt, value: d.vibration })) as SensorDataPoint[],
-    uv: rawData.map((d: any) => ({ time: d.createdAt, value: d.uv_status })) as SensorDataPoint[], // DB: uv_status
+    
+    // Tetap simpan di key 'uv', ambil dari d.uv
+    uv: rawData.map((d: any) => ({ time: d.createdAt, value: d.uv ?? d.uv_status ?? 0 })) as SensorDataPoint[], 
   };
 
-  // 3. Panggil Client Component dengan membawa data awal
   return <DashboardClient initialHistory={initialHistory} />;
 }
